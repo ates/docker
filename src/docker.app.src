@@ -1,0 +1,5 @@
+{application, docker, [
+    {description, "Docker LLi"},
+    {vsn, semver},
+    {applications, [kernel, stdlib, gun, jsx]}
+]}.
