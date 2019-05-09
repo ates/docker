@@ -14,7 +14,7 @@ d(Req) ->
     make_req(delete, Req, []).
 
 make_req(Method, URI, Data) ->
-    case gun:open_unix(socket_path(), #{}) of
+    case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
             StreamRef = send_req(Method, Pid, <<(api())/binary, URI/binary>>, Data),
             Response = wait_response(Pid, StreamRef, <<>>),
