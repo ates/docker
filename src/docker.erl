@@ -20,7 +20,7 @@ d(Req) ->
 make_req(Method, URI, Data) ->
     case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
-            StreamRef = send_req(Method, Pid, <<(api())/binary, URI/binary>>, Data),
+            StreamRef = send_req(Method, Pid, format_uri(URI), Data),
             Response = wait_response(Pid, StreamRef, undefined, <<>>),
             gun:close(Pid),
             Response;
@@ -58,7 +58,11 @@ from_json(Data) ->
             Data
     end.
 
-to_json(Data) when is_map(Data) -> jsx:encode(Data);
-to_json(Data) when is_binary(Data) -> cow_uri:urlencode(Data).
+to_json(Data) when is_map(Data) -> jsx:encode(Data).
+
+format_uri(URI) when is_binary(URI) ->
+    <<(api())/binary, URI/binary>>;
+format_uri({URI, QS}) ->
+    <<(api())/binary, URI/binary, "?", (cow_qs:qs(QS))/binary>>.
 
 api() -> application:get_env(docker, version, <<"/v1.37">>).
