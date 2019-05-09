@@ -17,7 +17,7 @@ make_req(Method, URI, Data) ->
     case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
             StreamRef = send_req(Method, Pid, <<(api())/binary, URI/binary>>, Data),
-            Response = wait_response(Pid, StreamRef, <<>>),
+            Response = wait_response(Pid, StreamRef, undefined, <<>>),
             gun:close(Pid),
             Response;
         Error -> Error
@@ -33,16 +33,16 @@ send_req(delete, Pid, URI, _Data) ->
 socket_path() ->
     application:get_env(?MODULE, socket, <<"/var/run/docker.sock">>).
 
-wait_response(Pid, StreamRef, Acc) ->
+wait_response(Pid, StreamRef, InitStatus, Acc) ->
     case gun:await(Pid, StreamRef) of
-        {response, nofin, _Status, _Headers} ->
-            wait_response(Pid, StreamRef, Acc);
+        {response, nofin, Status, _Headers} ->
+            wait_response(Pid, StreamRef, Status, Acc);
         {response, fin, Status, _Headers} ->
             {ok, Status, Acc};
         {data, nofin, Data} ->
-            wait_response(Pid, StreamRef, <<Acc/binary, Data/binary>>);
+            wait_response(Pid, StreamRef, InitStatus, <<Acc/binary, Data/binary>>);
         {data, fin, Data} ->
-            {ok, from_json(<<Acc/binary, Data/binary>>)};
+            {ok, InitStatus, from_json(<<Acc/binary, Data/binary>>)};
         Error -> Error
     end.
 
