@@ -1,11 +1,15 @@
 -module(docker).
 
 -export([g/1]).
+-export([p/1]).
 -export([p/2]).
 -export([d/1]).
 
 g(Req) ->
     make_req(get, Req, []).
+
+p(Req) ->
+    p(Req, #{}).
 
 p(Req, Data) ->
     make_req(post, Req, Data).
