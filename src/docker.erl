@@ -1,27 +1,39 @@
 -module(docker).
 
 -export([g/1]).
+-export([g/2]).
 -export([p/1]).
 -export([p/2]).
+-export([p/3]).
 -export([d/1]).
+-export([d/2]).
 
 g(Req) ->
-    make_req(get, Req, []).
+    g(Req, 5000).
+
+g(Req, Timeout) ->
+    make_req(get, Req, [], Timeout).
 
 p(Req) ->
-    p(Req, #{}).
+    p(Req, #{}, 5000).
 
 p(Req, Data) ->
-    make_req(post, Req, Data).
+    p(Req, Data, 5000).
+
+p(Req, Data, Timeout) ->
+    make_req(post, Req, Data, Timeout).
 
 d(Req) ->
-    make_req(delete, Req, []).
+    d(Req, 5000).
 
-make_req(Method, URI, Data) ->
+d(Req, Timeout) ->
+    make_req(delete, Req, [], Timeout).
+
+make_req(Method, URI, Data, Timeout) ->
     case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
             StreamRef = send_req(Method, Pid, format_uri(URI), Data),
-            Response = wait_response(Pid, StreamRef, undefined, <<>>),
+            Response = wait_response(Pid, StreamRef, undefined, <<>>, Timeout),
             gun:close(Pid),
             Response;
         Error -> Error
@@ -37,14 +49,14 @@ send_req(delete, Pid, URI, _Data) ->
 socket_path() ->
     application:get_env(?MODULE, socket, <<"/var/run/docker.sock">>).
 
-wait_response(Pid, StreamRef, InitStatus, Acc) ->
-    case gun:await(Pid, StreamRef) of
+wait_response(Pid, StreamRef, InitStatus, Acc, Timeout) ->
+    case gun:await(Pid, StreamRef, Timeout) of
         {response, nofin, Status, _Headers} ->
-            wait_response(Pid, StreamRef, Status, Acc);
+            wait_response(Pid, StreamRef, Status, Acc, Timeout);
         {response, fin, Status, _Headers} ->
             {ok, Status, Acc};
         {data, nofin, Data} ->
-            wait_response(Pid, StreamRef, InitStatus, <<Acc/binary, Data/binary>>);
+            wait_response(Pid, StreamRef, InitStatus, <<Acc/binary, Data/binary>>, Timeout);
         {data, fin, Data} ->
             {ok, InitStatus, from_json(<<Acc/binary, Data/binary>>)};
         Error -> Error
