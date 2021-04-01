@@ -42,7 +42,7 @@ make_req(Method, URI, Data, Timeout) ->
 send_req(get, Pid, URI, _Data) ->
     gun:get(Pid, URI);
 send_req(post, Pid, URI, Data) ->
-    gun:post(Pid, URI, [{<<"content-type">>, <<"application/json">>}], to_json(Data));
+    gun:post(Pid, URI, [{<<"content-type">>, <<"application/json">>}], jsx:encode(Data));
 send_req(delete, Pid, URI, _Data) ->
     gun:delete(Pid, URI).
 
@@ -64,13 +64,11 @@ wait_response(Pid, StreamRef, InitStatus, Acc, Timeout) ->
 
 from_json(Data) ->
     try
-        jsx:decode(Data, [return_maps])
+        jsx:decode(Data)
     catch
         _:_Reason:_Stack ->
             Data
     end.
-
-to_json(Data) when is_map(Data) -> jsx:encode(Data).
 
 format_uri(URI) when is_binary(URI) ->
     <<(api())/binary, URI/binary>>;
