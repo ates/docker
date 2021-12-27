@@ -70,6 +70,8 @@ from_json(Data) ->
             Data
     end.
 
+format_uri(URI) when is_list(URI) ->
+    format_uri(list_to_binary(URI));
 format_uri(URI) when is_binary(URI) ->
     <<(api())/binary, URI/binary>>;
 format_uri({URI, QS}) ->
