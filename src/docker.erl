@@ -5,6 +5,9 @@
 -export([p/1]).
 -export([p/2]).
 -export([p/3]).
+-export([put/1]).
+-export([put/2]).
+-export([put/3]).
 -export([d/1]).
 -export([d/2]).
 
@@ -22,6 +25,15 @@ p(Req, Data) ->
 
 p(Req, Data, Timeout) ->
     make_req(post, Req, Data, Timeout).
+
+put(Req) ->
+    put(Req, #{}, 5000).
+
+put(Req, Data) ->
+    put(Req, Data, 5000).
+
+put(Req, Data, Timeout) ->
+    make_req(put, Req, Data, Timeout).
 
 d(Req) ->
     d(Req, 5000).
@@ -41,10 +53,17 @@ make_req(Method, URI, Data, Timeout) ->
 
 send_req(get, Pid, URI, _Data) ->
     gun:get(Pid, URI);
-send_req(post, Pid, URI, Data) ->
-    gun:post(Pid, URI, [{<<"content-type">>, <<"application/json">>}], jsx:encode(Data));
 send_req(delete, Pid, URI, _Data) ->
-    gun:delete(Pid, URI).
+    gun:delete(Pid, URI);
+send_req(Method, Pid, URI, Data) when Method =:= post; Method =:= put ->
+    case Data of
+        {ContentType, Binary} when is_binary(Binary) ->
+            gun:Method(Pid, URI, [{<<"content-type">>, ContentType}], Binary);
+        Data when is_binary(Data) ->
+            gun:Method(Pid, URI, [{<<"content-type">>, <<"application/octet-steam">>}], Data);
+        Data when is_map(Data) ->
+            gun:Method(Pid, URI, [{<<"content-type">>, <<"application/json">>}], jsx:encode(Data))
+    end.
 
 socket_path() ->
     application:get_env(?MODULE, socket, <<"/var/run/docker.sock">>).
@@ -77,4 +96,4 @@ format_uri(URI) when is_binary(URI) ->
 format_uri({URI, QS}) ->
     <<(api())/binary, URI/binary, "?", (cow_qs:qs(QS))/binary>>.
 
-api() -> application:get_env(docker, version, <<"/v1.37">>).
+api() -> application:get_env(docker, version, <<"/v1.43">>).
