@@ -10,6 +10,8 @@
 -export([put/3]).
 -export([d/1]).
 -export([d/2]).
+-export([login/1]).
+-export([logout/0]).
 
 g(Req) ->
     g(Req, 5000).
@@ -41,6 +43,13 @@ d(Req) ->
 d(Req, Timeout) ->
     make_req(delete, Req, [], Timeout).
 
+%% base64url encoded token
+login(Token) when is_binary(Token) ->
+    persistent_term:put({?MODULE, auth}, Token).
+
+logout() ->
+    persistent_term:erase({?MODULE, auth}).
+
 make_req(Method, URI, Data, Timeout) ->
     case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
@@ -52,17 +61,27 @@ make_req(Method, URI, Data, Timeout) ->
     end.
 
 send_req(get, Pid, URI, _Data) ->
-    gun:get(Pid, URI);
+    gun:get(Pid, URI, auth_header());
 send_req(delete, Pid, URI, _Data) ->
-    gun:delete(Pid, URI);
+    gun:delete(Pid, URI, auth_header());
 send_req(Method, Pid, URI, Data) when Method =:= post; Method =:= put ->
+    {Headers, NewData} = prepare_headers_and_data(Data),
+    gun:Method(Pid, URI, auth_header() ++ Headers, NewData).
+
+auth_header() ->
+    case persistent_term:get({?MODULE, auth}, undefined) of
+        undefined -> [];
+        Secret -> [{<<"X-Registry-Auth">>, Secret}]
+    end.
+
+prepare_headers_and_data(Data) ->
     case Data of
         {ContentType, Binary} when is_binary(Binary) ->
-            gun:Method(Pid, URI, [{<<"content-type">>, ContentType}], Binary);
+            {[{<<"content-type">>, ContentType}], Binary};
         Data when is_binary(Data) ->
-            gun:Method(Pid, URI, [{<<"content-type">>, <<"application/octet-steam">>}], Data);
+            {[{<<"content-type">>, <<"application/octet-steam">>}], Data};
         Data when is_map(Data) ->
-            gun:Method(Pid, URI, [{<<"content-type">>, <<"application/json">>}], jsx:encode(Data))
+            {[{<<"content-type">>, <<"application/json">>}], jsx:encode(Data)}
     end.
 
 socket_path() ->
