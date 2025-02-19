@@ -5,6 +5,7 @@
 -export([p/1]).
 -export([p/2]).
 -export([p/3]).
+-export([p/4]).
 -export([put/1]).
 -export([put/2]).
 -export([put/3]).
@@ -26,7 +27,10 @@ p(Req, Data) ->
     p(Req, Data, 5000).
 
 p(Req, Data, Timeout) ->
-    make_req(post, Req, Data, Timeout).
+    p(Req, Data, false, Timeout).
+
+p(Req, Data, StreamFun, Timeout) ->
+    make_req(post, Req, Data, StreamFun, Timeout).
 
 put(Req) ->
     put(Req, #{}, 5000).
@@ -51,10 +55,13 @@ logout() ->
     persistent_term:erase({?MODULE, auth}).
 
 make_req(Method, URI, Data, Timeout) ->
+    make_req(Method, URI, Data, false, Timeout).
+
+make_req(Method, URI, Data, StreamFun, Timeout) ->
     case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
             StreamRef = send_req(Method, Pid, format_uri(URI), Data),
-            Response = wait_response(Pid, StreamRef, undefined, <<>>, Timeout),
+            Response = wait_response(Pid, StreamRef, undefined, <<>>, StreamFun, Timeout),
             gun:close(Pid),
             Response;
         Error -> Error
@@ -87,16 +94,27 @@ prepare_headers_and_data(Data) ->
 socket_path() ->
     application:get_env(?MODULE, socket, <<"/var/run/docker.sock">>).
 
-wait_response(Pid, StreamRef, InitStatus, Acc, Timeout) ->
+wait_response(Pid, StreamRef, InitStatus, Acc, StreamFun, Timeout) ->
     case gun:await(Pid, StreamRef, Timeout) of
         {response, nofin, Status, _Headers} ->
-            wait_response(Pid, StreamRef, Status, Acc, Timeout);
+            wait_response(Pid, StreamRef, Status, Acc, StreamFun, Timeout);
         {response, fin, Status, _Headers} ->
             {ok, Status, Acc};
         {data, nofin, Data} ->
-            wait_response(Pid, StreamRef, InitStatus, <<Acc/binary, Data/binary>>, Timeout);
+            case is_function(StreamFun) of
+                true ->
+                    StreamFun(Data),
+                    wait_response(Pid, StreamRef, InitStatus, Acc, StreamFun, Timeout);
+                false ->
+                    wait_response(Pid, StreamRef, InitStatus, <<Acc/binary, Data/binary>>, StreamFun, Timeout)
+            end;
         {data, fin, Data} ->
-            {ok, InitStatus, from_json(<<Acc/binary, Data/binary>>)};
+            case is_function(StreamFun) of
+                true ->
+                    {ok, InitStatus, #{}};
+                false ->
+                    {ok, InitStatus, from_json(<<Acc/binary, Data/binary>>)}
+            end;
         Error -> Error
     end.
 
