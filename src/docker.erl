@@ -111,6 +111,7 @@ wait_response(Pid, StreamRef, InitStatus, Acc, StreamFun, Timeout) ->
         {data, fin, Data} ->
             case is_function(StreamFun) of
                 true ->
+                    StreamFun(Data),
                     {ok, InitStatus, #{}};
                 false ->
                     {ok, InitStatus, from_json(<<Acc/binary, Data/binary>>)}
