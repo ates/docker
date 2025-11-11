@@ -134,4 +134,4 @@ format_uri(URI) when is_binary(URI) ->
 format_uri({URI, QS}) ->
     <<(api())/binary, URI/binary, "?", (cow_qs:qs(QS))/binary>>.
 
-api() -> application:get_env(docker, version, <<"/v1.43">>).
+api() -> application:get_env(docker, version, <<"/v1.45">>).
