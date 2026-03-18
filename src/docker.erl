@@ -86,7 +86,7 @@ prepare_headers_and_data(Data) ->
         {ContentType, Binary} when is_binary(Binary) ->
             {[{<<"content-type">>, ContentType}], Binary};
         Data when is_binary(Data) ->
-            {[{<<"content-type">>, <<"application/octet-steam">>}], Data};
+            {[{<<"content-type">>, <<"application/octet-stream">>}], Data};
         Data when is_map(Data) ->
             {[{<<"content-type">>, <<"application/json">>}], jsx:encode(Data)}
     end.
