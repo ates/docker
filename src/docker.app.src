@@ -1,5 +1,5 @@
 {application, docker, [
-    {description, "Docker LLi"},
+    {description, "Docker Low Level Interface"},
     {vsn, semver},
-    {applications, [kernel, stdlib, gun, jsx]}
+    {applications, [kernel, stdlib, gun]}
 ]}.

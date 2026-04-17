@@ -60,6 +60,7 @@ make_req(Method, URI, Data, Timeout) ->
 make_req(Method, URI, Data, StreamFun, Timeout) ->
     case gun:open_unix(socket_path(), #{http_opts => #{keepalive => infinity}}) of
         {ok, Pid} ->
+            {ok, _Protocol} = gun:await_up(Pid, Timeout),
             StreamRef = send_req(Method, Pid, format_uri(URI), Data),
             Response = wait_response(Pid, StreamRef, undefined, <<>>, StreamFun, Timeout),
             gun:close(Pid),
@@ -81,15 +82,12 @@ auth_header() ->
         Secret -> [{<<"X-Registry-Auth">>, Secret}]
     end.
 
-prepare_headers_and_data(Data) ->
-    case Data of
-        {ContentType, Binary} when is_binary(Binary) ->
-            {[{<<"content-type">>, ContentType}], Binary};
-        Data when is_binary(Data) ->
-            {[{<<"content-type">>, <<"application/octet-steam">>}], Data};
-        Data when is_map(Data) ->
-            {[{<<"content-type">>, <<"application/json">>}], jsx:encode(Data)}
-    end.
+prepare_headers_and_data({ContentType, Data}) when is_binary(Data) ->
+    {[{<<"content-type">>, ContentType}], Data};
+prepare_headers_and_data(Data) when is_binary(Data) ->
+    {[{<<"content-type">>, <<"application/octet-stream">>}], Data};
+prepare_headers_and_data(Data) when is_map(Data) ->
+    {[{<<"content-type">>, <<"application/json">>}], json:encode(Data)}.
 
 socket_path() ->
     application:get_env(?MODULE, socket, <<"/var/run/docker.sock">>).
@@ -121,7 +119,7 @@ wait_response(Pid, StreamRef, InitStatus, Acc, StreamFun, Timeout) ->
 
 from_json(Data) ->
     try
-        jsx:decode(Data)
+        json:decode(Data)
     catch
         _:_Reason:_Stack ->
             Data
